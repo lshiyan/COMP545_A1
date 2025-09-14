@@ -3,7 +3,8 @@ import random
 
 import torch
 import torch.nn as nn
-import random as rand
+import random
+import math
 
 def load_datasets(data_directory: str) -> Union[dict, dict]:
     """
@@ -174,7 +175,7 @@ def build_loader(
                 
             new_dict = {k: list(v) for k, v in zip(new_dict.keys(), zip(*rows))}
         
-        for i in range(data_length // batch_size + 1):
+        for i in range(math.ceil(data_length / batch_size)):
             start = i * batch_size
             end = min(start + batch_size, data_length)
             
@@ -185,6 +186,9 @@ def build_loader(
 
 ### 1.2 Converting a batch into inputs
 def convert_to_tensors(text_indices: "list[list[int]]") -> torch.Tensor:
+    
+    print(text_indices)
+
     longest_sentence = max([len(tokenized_sentence) for tokenized_sentence in text_indices])
     result = []
     
@@ -248,9 +252,9 @@ def bce_loss(y: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
     
     losses = -1 * (y * torch.log(y_pred) + (1 - y) * torch.log(1 - y_pred)) / n
     
-    bce_loss = sum(losses)
+    bce_loss = losses.sum()
     
-    return torch.tensor(bce_loss, requires_grad=True)
+    return bce_loss
 
 ### 2.3 Forward and backward pass
 def forward_pass(model: nn.Module, batch: dict, device="cpu"):
@@ -266,6 +270,7 @@ def forward_pass(model: nn.Module, batch: dict, device="cpu"):
 def backward_pass(
     optimizer: torch.optim.Optimizer, y: torch.Tensor, y_pred: torch.Tensor
 ) -> torch.Tensor:
+        
     optimizer.zero_grad()
     loss = bce_loss(y, y_pred)
     loss.backward()
@@ -279,6 +284,7 @@ def f1_score(y: torch.Tensor, y_pred: torch.Tensor, threshold=0.5) -> torch.Tens
     if threshold:
         y_pred = torch.where(y_pred > 0.5, torch.tensor(1), torch.tensor(0))
     
+
     TP = 0
     FP = 0
     TN = 0
@@ -300,19 +306,21 @@ def f1_score(y: torch.Tensor, y_pred: torch.Tensor, threshold=0.5) -> torch.Tens
     precision = TP / (TP + FP)
     recall = TP / (TP + FN)
     
+    print(TP, FP, TN, FN)
+    
     f1_score= 2 / ((1/precision) + (1/recall))
     
     return torch.tensor(f1_score)
 
 ### 2.5 Train loop
 
-def process_batch(batch: Iterable[dict]) -> dict:
+def process_batch(batch: dict) -> dict:
         """
         Processes a batch into tokenized form.
 
         Parameters
         ----------
-        batch: Iterable[dict]
+        batch: dict
             A dictionary containing the "premise", "hypothesis", and "label" lists.
 
         Returns
@@ -354,7 +362,6 @@ def eval_run(
     y_pred = torch.tensor([])
     
     for batch in loader():
-        print("batch is:", batch)
         true_labels = batch["label"]
         y_true = torch.cat((y_true, torch.tensor(true_labels)))
         
@@ -381,13 +388,12 @@ def train_loop(
         model.train()
         
         for batch in train_loader():
-            print("batch is", batch)
             y_true = torch.tensor(batch["label"])
             predictions = forward_pass(model, batch)
             backward_pass(optimizer, y_true, predictions)
         
         model.eval()
-        
+
         valid_true, valid_predictions = eval_run(model, valid_loader)
         score = f1_score(valid_true, valid_predictions)
         f1_scores.append(score.item())
@@ -552,19 +558,21 @@ if __name__ == "__main__":
     }
     
     # 1.1
-    train_loader = build_loader(train_raw, 4, True)
-    valid_loader = build_loader(valid_raw, 32, True)
+    train_loader = build_loader(train_indices, 32, True)
+    valid_loader = build_loader(valid_indices, 32, True)
+    
     # 1.2
     batch = next(train_loader())
     
     # 2.1
     embedding = nn.Embedding(10000, 64)
     model = PooledLogisticRegression(embedding)
-    optimizer = assign_optimizer(model, lr=0.01, momentum=0.9, weight_decay=1e-4)
+    optimizer = assign_optimizer(model, lr=0.001, momentum=0.9, weight_decay=1e-4)
     for x in train_loop(model, train_loader, valid_loader, optimizer, n_epochs=2, device=device):
         continue
+    
     # 2.2
-    optimizer = assign_optimizer(model, lr=0.001, momentum=0.9)
+    optimizer = "your code here"
 
     # 2.4
     score = "your code here"
