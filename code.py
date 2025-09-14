@@ -355,11 +355,10 @@ def eval_run(
     
     for batch in loader():
         print("batch is:", batch)
-        tokenized_batch = process_batch(batch)
         true_labels = batch["label"]
         y_true = torch.cat((y_true, torch.tensor(true_labels)))
         
-        predictions = forward_pass(model, tokenized_batch)
+        predictions = forward_pass(model, batch)
         y_pred = torch.cat((y_pred, predictions))
     
     return torch.tensor(y_true), torch.tensor(y_pred)
@@ -383,9 +382,8 @@ def train_loop(
         
         for batch in train_loader():
             print("batch is", batch)
-            tokenized_batch = process_batch(batch)
-            y_true = torch.tensor(tokenized_batch["label"])
-            predictions = forward_pass(model, tokenized_batch)
+            y_true = torch.tensor(batch["label"])
+            predictions = forward_pass(model, batch)
             backward_pass(optimizer, y_true, predictions)
         
         model.eval()
