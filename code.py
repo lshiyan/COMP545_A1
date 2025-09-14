@@ -187,8 +187,6 @@ def build_loader(
 ### 1.2 Converting a batch into inputs
 def convert_to_tensors(text_indices: "list[list[int]]") -> torch.Tensor:
     
-    print(text_indices)
-
     longest_sentence = max([len(tokenized_sentence) for tokenized_sentence in text_indices])
     result = []
     
@@ -196,8 +194,7 @@ def convert_to_tensors(text_indices: "list[list[int]]") -> torch.Tensor:
         tokenized_sentence = tokenized_sentence + [0]*(longest_sentence - len(tokenized_sentence))
         result.append(tokenized_sentence)
     
-    print(torch.tensor(result, dtype=torch.long))
-    return torch.tensor(result, dtype=torch.long)
+    return torch.tensor(result, dtype=torch.int32)
 
 ### 2.1 Design a logistic model with embedding and pooling
 def max_pool(x: torch.Tensor) -> torch.Tensor:
