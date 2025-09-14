@@ -161,25 +161,20 @@ def build_loader(
     data_dict: dict, batch_size: int = 64, shuffle: bool = False
 ) -> Callable[[], Iterable[dict]]:
     
-    first_key = next(iter(data_dict))
-    n = len(data_dict[first_key])
-    split_indices = list(range(0, n, batch_size))
+    length = len(next(iter(data_dict)))
     
-    if shuffle:
-        rand.shuffle(split_indices)
-
     def loader():
-        total_batches = len(split_indices)
+        indices = range(length)
         
-        for i in range(total_batches):
-            starting_index = split_indices[i]
+        if shuffle:
+            rand.shuffle(indices)
+        
+        for start in range(0, length, batch_size):
+            end = min(start + batch_size, length)
+            batch_indices = indices[start:end]
+            batch = {key: [data_dict[key][i] for i in batch_indices] for key in data_dict}
             
-            #If last batch, it can be shorter.
-            end_index = min(split_indices[i] + batch_size, n)
-
-            new_dict = {key: data_dict[key][starting_index: end_index] for key in data_dict}
-            
-            yield new_dict
+            yield batch
             
     return loader
 
@@ -376,6 +371,8 @@ def train_loop(
 
     model.to(device)
     
+    f1_scores = []
+    
     for _ in range(n_epochs): 
         
         model.train()
@@ -388,15 +385,13 @@ def train_loop(
         
         model.eval()
         
-        f1_scores = []
-        
         valid_true, valid_predictions = eval_run(model, valid_loader)
         score = f1_score(valid_true, valid_predictions)
         f1_scores.append(score.item())
             
-        print(score)
+        print(f"F1 score: {score}")
         
-        yield f1_scores
+    return f1_scores
 
 ### 3.1
 class ShallowNeuralNetwork(nn.Module):
