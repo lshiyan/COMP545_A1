@@ -255,47 +255,7 @@ def bce_loss(y: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
 ### 2.3 Forward and backward pass
 def forward_pass(model: nn.Module, batch: dict, device="cpu"):
     
-    def process_batch(batch: Iterable[dict]):
-        """
-        Processes a batch into tokenized form.
-
-        Parameters
-        ----------
-        batch: Iterable[dict]
-            A dictionary containing the "premise", "hypothesis", and "label" lists.
-
-        Returns
-        -------
-        labels: List[int]
-            A list of the true labels for each example.
-        
-        tokenized_premise: torch.Tensor
-            A tensor of the tokenized premise sentences.
-            
-        tokenized_hypothesis: torch.Tensor
-            A tensor of the tokenized hypothesis sentences.
-        """
-        
-        print(batch)
-        print(batch["premise"])
-        batch_tokens = {
-            "premise": tokenize(batch["premise"], max_length=64),
-            "hypothesis": tokenize(batch["hypothesis"], max_length=64),
-        }
-
-        word_counts = build_word_counts(
-            batch_tokens["premise"]
-            + batch_tokens["hypothesis"]
-        )
-        
-        index_map = build_index_map(word_counts, max_words=10000)
-
-        tokenized_premise = tokens_to_ix(batch_tokens["premise"], index_map)
-        tokenized_hypothesis = tokens_to_ix(batch_tokens["hypothesis"], index_map)
-        
-        return convert_to_tensors(tokenized_premise), convert_to_tensors(tokenized_hypothesis)
-    
-    premise, hypothesis = process_batch(batch)
+    premise, hypothesis = convert_to_tensors(batch["premise"]), convert_to_tensors(batch["hypothesis"])
     
     premise.to(device)
     hypothesis.to(device)
@@ -372,6 +332,46 @@ def train_loop(
     n_epochs: int = 3,
     device: str = "cpu",
 ):
+    
+    def process_batch(batch: Iterable[dict]) -> dict:
+        """
+        Processes a batch into tokenized form.
+
+        Parameters
+        ----------
+        batch: Iterable[dict]
+            A dictionary containing the "premise", "hypothesis", and "label" lists.
+
+        Returns
+        -------
+        labels: List[int]
+            A list of the true labels for each example.
+        
+        tokenized_premise: torch.Tensor
+            A tensor of the tokenized premise sentences.
+            
+        tokenized_hypothesis: torch.Tensor
+            A tensor of the tokenized hypothesis sentences.
+        """
+        
+        print(batch)
+        print(batch["premise"])
+        batch_tokens = {
+            "premise": tokenize(batch["premise"], max_length=64),
+            "hypothesis": tokenize(batch["hypothesis"], max_length=64),
+        }
+
+        word_counts = build_word_counts(
+            batch_tokens["premise"]
+            + batch_tokens["hypothesis"]
+        )
+        
+        index_map = build_index_map(word_counts, max_words=10000)
+
+        tokenized_premise = tokens_to_ix(batch_tokens["premise"], index_map)
+        tokenized_hypothesis = tokens_to_ix(batch_tokens["hypothesis"], index_map)
+        
+        return {"premise": tokenized_premise, "hypothesis": tokenized_hypothesis, "label": batch["label"]}
 
     model.to(device)
     
@@ -382,8 +382,9 @@ def train_loop(
         model.train()
         
         for batch in train_loader():
-            y_true = torch.tensor(batch["label"])
-            predictions = forward_pass(model, batch)
+            tokenized_batch = process_batch(batch)
+            y_true = torch.tensor(tokenized_batch["label"])
+            predictions = forward_pass(model, tokenized_batch)
             backward_pass(optimizer, y_true, predictions)
         
         model.eval()
