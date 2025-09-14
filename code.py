@@ -255,13 +255,13 @@ def bce_loss(y: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
 ### 2.3 Forward and backward pass
 def forward_pass(model: nn.Module, batch: dict, device="cpu"):
     
-    premise, hypothesis = convert_to_tensors(batch["premise"]), convert_to_tensors(batch["hypothesis"])
+    tensor_premise, tensor_hypothesis = convert_to_tensors(batch["premise"]), convert_to_tensors(batch["hypothesis"])
     
-    premise.to(device)
-    hypothesis.to(device)
+    tensor_premise.to(device)
+    tensor_hypothesis.to(device)
     model.to(device)
     
-    return model(premise, hypothesis)
+    return model(tensor_premise, tensor_hypothesis)
 
 def backward_pass(
     optimizer: torch.optim.Optimizer, y: torch.Tensor, y_pred: torch.Tensor
@@ -305,35 +305,8 @@ def f1_score(y: torch.Tensor, y_pred: torch.Tensor, threshold=0.5) -> torch.Tens
     return torch.tensor(f1_score)
 
 ### 2.5 Train loop
-def eval_run(
-    model: nn.Module, loader: Callable[[], Iterable[dict]], device: str = "cpu"
-) -> torch.Tensor:
-    
-    model.to(device)
-    
-    y_true = torch.tensor([])
-    y_pred = torch.tensor([])
-    
-    for batch in loader():
-        true_labels = batch["label"]
-        y_true = torch.cat((y_true, torch.tensor(true_labels)))
-        
-        predictions = forward_pass(model, batch)
-        y_pred = torch.cat((y_pred, predictions))
-    
-    return torch.tensor(y_true), torch.tensor(y_pred)
 
-
-def train_loop(
-    model: nn.Module,
-    train_loader,
-    valid_loader,
-    optimizer,
-    n_epochs: int = 3,
-    device: str = "cpu",
-):
-    
-    def process_batch(batch: Iterable[dict]) -> dict:
+def process_batch(batch: Iterable[dict]) -> dict:
         """
         Processes a batch into tokenized form.
 
@@ -354,8 +327,6 @@ def train_loop(
             A tensor of the tokenized hypothesis sentences.
         """
         
-        print(batch)
-        print(batch["premise"])
         batch_tokens = {
             "premise": tokenize(batch["premise"], max_length=64),
             "hypothesis": tokenize(batch["hypothesis"], max_length=64),
@@ -372,6 +343,34 @@ def train_loop(
         tokenized_hypothesis = tokens_to_ix(batch_tokens["hypothesis"], index_map)
         
         return {"premise": tokenized_premise, "hypothesis": tokenized_hypothesis, "label": batch["label"]}
+    
+def eval_run(
+    model: nn.Module, loader: Callable[[], Iterable[dict]], device: str = "cpu"
+) -> torch.Tensor:
+    
+    model.to(device)
+    
+    y_true = torch.tensor([])
+    y_pred = torch.tensor([])
+    
+    for batch in loader():
+        tokenized_batch = process_batch(batch)
+        true_labels = batch["label"]
+        y_true = torch.cat((y_true, torch.tensor(true_labels)))
+        
+        predictions = forward_pass(model, tokenized_batch)
+        y_pred = torch.cat((y_pred, predictions))
+    
+    return torch.tensor(y_true), torch.tensor(y_pred)
+
+def train_loop(
+    model: nn.Module,
+    train_loader,
+    valid_loader,
+    optimizer,
+    n_epochs: int = 3,
+    device: str = "cpu",
+):
 
     model.to(device)
     
