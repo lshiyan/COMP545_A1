@@ -501,7 +501,7 @@ class DeepNeuralNetwork(nn.Module):
         hidden_layer = concatenated_embeddings
         
         for h_layer in ff_layers:
-            hidden_layer = act(h_layer(concatenated_embeddings))
+            hidden_layer = act(h_layer(hidden_layer))
             
         predictions = layer_pred(hidden_layer)
         sigmoid_predictions = sigmoid(predictions)
