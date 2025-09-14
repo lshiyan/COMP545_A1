@@ -164,16 +164,18 @@ def build_loader(
     data_length = len(next(iter(data_dict)))
     
     def loader():   
-        indices = list(range(data_length))
         
         if shuffle:
-            rand.shuffle(indices)
+            rows = list(zip(*data_dict.values()))
+            random.shuffle(rows)
+                
+            data_dict = {k: list(v) for k, v in zip(data_dict.keys(), zip(*rows))}
         
-        for start in range(0, data_length, batch_size):
-            end = min(start + batch_size, data_length)
-            batch_indices = indices[start:end]
+        for i in range(data_length // batch_size + 1):
+            start = i * batch_size
+            end = min((i + 1) * batch_size, data_length)
             
-            batch = {key: [data_dict[key][i] for i in batch_indices] for key in data_dict}
+            batch = {k: v[start:end] for k, v in data_dict.items()}
             yield batch
             
     return loader
