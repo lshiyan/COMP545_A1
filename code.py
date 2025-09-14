@@ -165,17 +165,19 @@ def build_loader(
     
     def loader():   
         
+        new_dict = data_dict
+        
         if shuffle:
-            rows = list(zip(*data_dict.values()))
+            rows = list(zip(*new_dict.values()))
             random.shuffle(rows)
                 
-            data_dict = {k: list(v) for k, v in zip(data_dict.keys(), zip(*rows))}
+            new_dict = {k: list(v) for k, v in zip(new_dict.keys(), zip(*rows))}
         
         for i in range(data_length // batch_size + 1):
             start = i * batch_size
             end = min((i + 1) * batch_size, data_length)
             
-            batch = {k: v[start:end] for k, v in data_dict.items()}
+            batch = {k: v[start:end] for k, v in new_dict.items()}
             yield batch
             
     return loader
