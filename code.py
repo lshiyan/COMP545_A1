@@ -1,11 +1,9 @@
-from typing import Union, Iterable, Callable, List
+from typing import Union, Iterable, Callable
 import random
-import math
 
 import torch
 import torch.nn as nn
 import random as rand
-import numpy as np
 
 def load_datasets(data_directory: str) -> Union[dict, dict]:
     """
@@ -198,18 +196,8 @@ def convert_to_tensors(text_indices: "list[list[int]]") -> torch.Tensor:
 
 ### 2.1 Design a logistic model with embedding and pooling
 def max_pool(x: torch.Tensor) -> torch.Tensor:
-    
-    N, _, E = x.shape
-    
-    result = torch.zeros(N, E)
-    
-    for i in range(N):
-        sentence_embeddings = x[i]
-        
-        max_pool = torch.max(sentence_embeddings, 0).values
-        result[i] = max_pool
 
-    return result
+    return torch.max(x, dim = 1).values
 
 class PooledLogisticRegression(nn.Module):
     def __init__(self, embedding: nn.Embedding):
@@ -255,16 +243,14 @@ def assign_optimizer(model: nn.Module, **kwargs) -> torch.optim.Optimizer:
     optimizer = torch.optim.SGD(model.parameters(), **kwargs)
     return optimizer
 
-
 def bce_loss(y: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
-    y_list = y.tolist()
-    y_pred_list = y_pred.tolist()
-    n = len(y_list)
+    n = len(y)
     
-    loss_list = [-1*(y_list[i]*math.log(y_pred_list[i]) + (1-y_list[i])*math.log(1-y_pred_list[i])) / n for i in range(n)]
-    bce_loss = sum(loss_list)
+    losses = -1 * (y * torch.log(y_pred) + (1 - y) * torch.log(1 - y_pred)) / n
     
-    return torch.tensor([bce_loss])
+    bce_loss = sum(losses)
+    
+    return torch.tensor(bce_loss, requires_grad=True)
 
 ### 2.3 Forward and backward pass
 def forward_pass(model: nn.Module, batch: dict, device="cpu"):
@@ -302,8 +288,8 @@ def forward_pass(model: nn.Module, batch: dict, device="cpu"):
         
         index_map = build_index_map(word_counts, max_words=10000)
 
-        tokenized_premise = tokens_to_ix(batch["premise"], index_map)
-        tokenized_hypothesis = tokens_to_ix(batch["hypothesis"], index_map)
+        tokenized_premise = tokens_to_ix(batch_tokens["premise"], index_map)
+        tokenized_hypothesis = tokens_to_ix(batch_tokens["hypothesis"], index_map)
         
         return convert_to_tensors(tokenized_premise), convert_to_tensors(tokenized_hypothesis)
     
@@ -356,7 +342,7 @@ def f1_score(y: torch.Tensor, y_pred: torch.Tensor, threshold=0.5) -> torch.Tens
     
     f1_score= 2 / ((1/precision) + (1/recall))
     
-    return torch.tensor([f1_score])
+    return torch.tensor(f1_score)
 
 ### 2.5 Train loop
 def eval_run(
@@ -390,28 +376,27 @@ def train_loop(
 
     model.to(device)
     
-    for _ in n_epochs: 
+    for _ in range(n_epochs): 
         
         model.train()
         
         for batch in train_loader():
-            y_true = batch["labels"]
+            y_true = torch.tensor(batch["label"])
             predictions = forward_pass(model, batch)
+            print(predictions)
             backward_pass(optimizer, y_true, predictions)
         
         model.eval()
         
         f1_scores = []
         
-        for valid_batch in valid_loader():
-            y_true = valid_batch["labels"]
-            predictions = forward_pass(model, valid_batch)
-            score = f1_score(y_true, predictions)
-            f1_scores.append(score.item())
+        valid_true, valid_predictions = eval_run(model, valid_loader)
+        score = f1_score(valid_true, valid_predictions)
+        f1_scores.append(score.item())
             
-            print(score)
-            
-            yield f1_scores
+        print(score)
+        
+        yield f1_scores
 
 ### 3.1
 class ShallowNeuralNetwork(nn.Module):
@@ -517,10 +502,9 @@ class DeepNeuralNetwork(nn.Module):
         hidden_layer = concatenated_embeddings
         
         for h_layer in ff_layers:
-            hidden_layer = h_layer(concatenated_embeddings)
+            hidden_layer = act(h_layer(concatenated_embeddings))
             
-        activated_hidden_layer = act(hidden_layer)
-        predictions = layer_pred(activated_hidden_layer)
+        predictions = layer_pred(hidden_layer)
         sigmoid_predictions = sigmoid(predictions)
         probabilities = torch.squeeze(sigmoid_predictions, 1)
         
@@ -571,8 +555,8 @@ if __name__ == "__main__":
     }
     
     # 1.1
-    train_loader = build_loader(train_raw, 64, True)
-    valid_loader = build_loader(valid_raw, 64, True)
+    train_loader = build_loader(train_raw, 32, True)
+    valid_loader = build_loader(valid_raw, 32, True)
     
     # 1.2
     batch = next(train_loader())
@@ -580,15 +564,12 @@ if __name__ == "__main__":
     # 2.1
     embedding = nn.Embedding(10000, 64)
     model = PooledLogisticRegression(embedding)
+    optimizer = assign_optimizer(model, lr=0.01, momentum=0.9, weight_decay=1e-4)
+    for x in train_loop(model, train_loader, valid_loader, optimizer, 3):
+        break
     
     # 2.2
-    optimizer = "your code here"
-
-    # 2.3
-    y_pred = torch.tensor([0.55,0.21,0.69,0.12])
-    y = torch.tensor([1,0,1,0])
-    score = f1_score(y, y_pred, threshold=0.5)
-    print(score)
+    optimizer = assign_optimizer(model, lr=0.001, momentum=0.9)
 
     # 2.4
     score = "your code here"
