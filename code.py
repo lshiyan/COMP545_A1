@@ -161,19 +161,19 @@ def build_loader(
     data_dict: dict, batch_size: int = 64, shuffle: bool = False
 ) -> Callable[[], Iterable[dict]]:
     
-    length = len(next(iter(data_dict)))
+    data_length = len(next(iter(data_dict)))
     
-    def loader():
-        indices = range(length)
+    def loader():   
+        indices = list(range(data_length))
         
         if shuffle:
             rand.shuffle(indices)
         
-        for start in range(0, length, batch_size):
-            end = min(start + batch_size, length)
+        for start in range(0, data_length, batch_size):
+            end = min(start + batch_size, data_length)
             batch_indices = indices[start:end]
-            batch = {key: [data_dict[key][i] for i in batch_indices] for key in data_dict}
             
+            batch = {key: [data_dict[key][i] for i in batch_indices] for key in data_dict}
             yield batch
             
     return loader
