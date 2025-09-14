@@ -276,6 +276,7 @@ def forward_pass(model: nn.Module, batch: dict, device="cpu"):
             A tensor of the tokenized hypothesis sentences.
         """
         
+        print(batch)
         print(batch["premise"])
         batch_tokens = {
             "premise": tokenize(batch["premise"], max_length=64),
