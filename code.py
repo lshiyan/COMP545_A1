@@ -161,7 +161,8 @@ def build_loader(
     data_dict: dict, batch_size: int = 64, shuffle: bool = False
 ) -> Callable[[], Iterable[dict]]:
     
-    data_length = len(next(iter(data_dict)))
+    first_key = next(iter(data_dict.keys()))
+    data_length = len(data_dict[first_key])
     
     def loader():   
         
@@ -175,9 +176,9 @@ def build_loader(
         
         for i in range(data_length // batch_size + 1):
             start = i * batch_size
-            end = min((i + 1) * batch_size, data_length)
+            end = min(start + batch_size, data_length)
             
-            batch = {k: v[start:end] for k, v in new_dict.items()}
+            batch = {key: value[start:end] for key, value in new_dict.items()}
             yield batch
             
     return loader
@@ -313,10 +314,9 @@ def backward_pass(
 ### 2.4 Evaluation
 def f1_score(y: torch.Tensor, y_pred: torch.Tensor, threshold=0.5) -> torch.Tensor:
     
+    print(y_pred)
     if threshold:
-        for i in range(len(y_pred)):
-            probability = y_pred[i]
-            y_pred[i] = 1 if probability > threshold else 0
+        y_pred = torch.where(x > 0.5, torch.tensor(1), torch.tensor(0))
     
     TP = 0
     FP = 0
@@ -348,18 +348,17 @@ def eval_run(
     model: nn.Module, loader: Callable[[], Iterable[dict]], device: str = "cpu"
 ) -> torch.Tensor:
     
-    model.eval()
     model.to(device)
     
-    y_true = []
-    y_pred = []
+    y_true = torch.tensor([])
+    y_pred = torch.tensor([])
     
     for batch in loader():
-        true_labels = batch["labels"]
-        y_true.append(true_labels)
+        true_labels = batch["label"]
+        y_true = torch.cat((y_true, torch.tensor(true_labels)))
         
-        predictions = forward_pass(model, batch).tolist()
-        y_pred.append(predictions)
+        predictions = forward_pass(model, batch)
+        y_pred = torch.cat((y_pred, predictions))
     
     return torch.tensor(y_true), torch.tensor(y_pred)
 
@@ -384,7 +383,6 @@ def train_loop(
         for batch in train_loader():
             y_true = torch.tensor(batch["label"])
             predictions = forward_pass(model, batch)
-            print(predictions)
             backward_pass(optimizer, y_true, predictions)
         
         model.eval()
@@ -553,9 +551,8 @@ if __name__ == "__main__":
     }
     
     # 1.1
-    train_loader = build_loader(train_raw, 32, True)
+    train_loader = build_loader(train_raw, 128, True)
     valid_loader = build_loader(valid_raw, 32, True)
-    
     # 1.2
     batch = next(train_loader())
     
@@ -563,9 +560,8 @@ if __name__ == "__main__":
     embedding = nn.Embedding(10000, 64)
     model = PooledLogisticRegression(embedding)
     optimizer = assign_optimizer(model, lr=0.01, momentum=0.9, weight_decay=1e-4)
-    for x in train_loop(model, train_loader, valid_loader, optimizer, 3):
-        break
-    
+    for x in train_loop(model, train_loader, valid_loader, optimizer, n_epochs=2, device=device):
+        continue
     # 2.2
     optimizer = assign_optimizer(model, lr=0.001, momentum=0.9)
 
