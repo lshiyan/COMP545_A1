@@ -276,6 +276,7 @@ def forward_pass(model: nn.Module, batch: dict, device="cpu"):
             A tensor of the tokenized hypothesis sentences.
         """
         
+        print(batch["premise"])
         batch_tokens = {
             "premise": tokenize(batch["premise"], max_length=64),
             "hypothesis": tokenize(batch["hypothesis"], max_length=64),
@@ -314,9 +315,8 @@ def backward_pass(
 ### 2.4 Evaluation
 def f1_score(y: torch.Tensor, y_pred: torch.Tensor, threshold=0.5) -> torch.Tensor:
     
-    print(y_pred)
     if threshold:
-        y_pred = torch.where(x > 0.5, torch.tensor(1), torch.tensor(0))
+        y_pred = torch.where(y_pred > 0.5, torch.tensor(1), torch.tensor(0))
     
     TP = 0
     FP = 0
@@ -551,7 +551,7 @@ if __name__ == "__main__":
     }
     
     # 1.1
-    train_loader = build_loader(train_raw, 128, True)
+    train_loader = build_loader(train_raw, 4, True)
     valid_loader = build_loader(valid_raw, 32, True)
     # 1.2
     batch = next(train_loader())
