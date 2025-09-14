@@ -382,7 +382,7 @@ def train_loop(
         model.train()
         
         for batch in train_loader():
-            print("batch is": batch)
+            print("batch is", batch)
             tokenized_batch = process_batch(batch)
             y_true = torch.tensor(tokenized_batch["label"])
             predictions = forward_pass(model, tokenized_batch)
