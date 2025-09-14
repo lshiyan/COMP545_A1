@@ -192,7 +192,7 @@ def convert_to_tensors(text_indices: "list[list[int]]") -> torch.Tensor:
         tokenized_sentence = tokenized_sentence + [0]*(longest_sentence - len(tokenized_sentence))
         result.append(tokenized_sentence)
     
-    return torch.tensor(result)
+    return torch.tensor(result, dtype=torch.long)
 
 ### 2.1 Design a logistic model with embedding and pooling
 def max_pool(x: torch.Tensor) -> torch.Tensor:
