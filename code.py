@@ -456,11 +456,10 @@ class DeepNeuralNetwork(nn.Module):
         super().__init__()
 
         self.embedding = embedding
-        self.ff_layers = [None]*num_layers
-        
-        self.ff_layers[0] = nn.Linear(self.embedding.embedding_dim * 2, hidden_size)
-        for i in range(1, num_layers):
-            self.ff_layers[i] = nn.Linear(hidden_size, hidden_size)
+        self.ff_layers = nn.ModuleList()
+        self.ff_layers.append(nn.Linear(self.embedding.embedding_dim * 2, hidden_size))
+        for _ in range(num_layers - 1):
+            self.ff_layers.append(nn.Linear(hidden_size, hidden_size))
             
         self.layer_pred = nn.Linear(hidden_size, 1)
         self.sigmoid = nn.Sigmoid()
