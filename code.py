@@ -301,10 +301,10 @@ def f1_score(y: torch.Tensor, y_pred: torch.Tensor, threshold=0.5) -> torch.Tens
         elif not real_label and not predicted_label:
             TN += 1
     
+    print(TP, FP, TN, FN)
+    
     precision = TP / (TP + FP)
     recall = TP / (TP + FN)
-    
-    print(TP, FP, TN, FN)
     
     f1_score= 2 / ((1/precision) + (1/recall))
     
@@ -386,9 +386,11 @@ def train_loop(
         model.train()
         
         for batch in train_loader():
-            print(batch)
+            print("batch is", batch)
             y_true = torch.tensor(batch["label"])
+            print("y_true is", y_true)
             predictions = forward_pass(model, batch)
+            print("predictions are", predictions)
             backward_pass(optimizer, y_true, predictions)
         
         model.eval()
