@@ -386,6 +386,7 @@ def train_loop(
         model.train()
         
         for batch in train_loader():
+            print(batch)
             y_true = torch.tensor(batch["label"])
             predictions = forward_pass(model, batch)
             backward_pass(optimizer, y_true, predictions)
@@ -556,8 +557,8 @@ if __name__ == "__main__":
     }
     
     # 1.1
-    train_loader = build_loader(train_indices, 32, True)
-    valid_loader = build_loader(valid_indices, 32, True)
+    train_loader = build_loader(train_indices, 128, True)
+    valid_loader = build_loader(valid_indices, 128, True)
     
     # 1.2
     batch = next(train_loader())
@@ -565,8 +566,8 @@ if __name__ == "__main__":
     # 2.1
     embedding = nn.Embedding(10000, 64)
     model = PooledLogisticRegression(embedding)
-    optimizer = assign_optimizer(model, lr=0.001, momentum=0.9, weight_decay=1e-4)
-    for x in train_loop(model, train_loader, valid_loader, optimizer, n_epochs=2, device=device):
+    optimizer = assign_optimizer(model, lr=0.001)
+    for x in train_loop(model, train_loader, valid_loader, optimizer, n_epochs=5, device=device):
         continue
     
     # 2.2
