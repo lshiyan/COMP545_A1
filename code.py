@@ -397,7 +397,7 @@ def train_loop(
 
         valid_true, valid_predictions = eval_run(model, valid_loader)
         score = 10
-        f1_scores.append(score.item())
+        f1_scores.append(score)
             
         print(f"F1 score: {score}")
         
