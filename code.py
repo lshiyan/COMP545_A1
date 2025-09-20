@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 import random
 import math
-import matplotlib.pyplot as plt
 
 def load_datasets(data_directory: str) -> Union[dict, dict]:
     """
@@ -537,16 +536,6 @@ if __name__ == "__main__":
     model3 = DeepNeuralNetwork(embedding3, hidden_size=64, num_layers=3)
     optimizer3 = assign_optimizer(model3, lr=0.0005)
     f1_scores3 = train_loop(model3, train_loader3, valid_loader3, optimizer3, n_epochs=8, device=device)
-    
-    plt.figure(figsize=(10,6))
-    plt.plot(f1_scores1, label='Pooled Logistic Regression F1 Score')
-    plt.plot(f1_scores2, label='Shallow Neural Network F1 Score')
-    plt.plot(f1_scores3, label='Deep Neural Network F1 Score')
-    plt.xlabel('Epoch')
-    plt.ylabel('F1 Score')
-    plt.title('F1 Score per Epoch for Different Models')
-    plt.legend()
-    plt.savefig("f1_scores.png")
 
     # 2.2
     optimizer = "your code here"
