@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import random
 import math
+import matplotlib.pyplot as plt
 
 def load_datasets(data_directory: str) -> Union[dict, dict]:
     """
@@ -166,20 +167,15 @@ def build_loader(
     data_length = len(data_dict[first_key])
     
     def loader():   
-        
-        new_dict = data_dict
-        
+        indices = list(range(data_length))
         if shuffle:
-            rows = list(zip(*new_dict.values()))
-            random.shuffle(rows)
-                
-            new_dict = {k: list(v) for k, v in zip(new_dict.keys(), zip(*rows))}
+            random.shuffle(indices)
         
         for i in range(math.ceil(data_length / batch_size)):
             start = i * batch_size
             end = min(start + batch_size, data_length)
-            
-            batch = {key: value[start:end] for key, value in new_dict.items()}
+            batch_indices = indices[start:end]
+            batch = {key: [value[j] for j in batch_indices] for key, value in data_dict.items()}
             yield batch
             
     return loader
@@ -242,15 +238,13 @@ class PooledLogisticRegression(nn.Module):
 
 ### 2.2 Choose an optimizer and a loss function
 def assign_optimizer(model: nn.Module, **kwargs) -> torch.optim.Optimizer:
-    optimizer = torch.optim.SGD(model.parameters(), **kwargs)
+    optimizer = torch.optim.Adam(model.parameters(), **kwargs)
     return optimizer
 
 def bce_loss(y: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
-    n = len(y)
+    losses = -1 * (y * torch.log(y_pred) + (1 - y) * torch.log(1 - y_pred))
     
-    losses = -1 * (y * torch.log(y_pred) + (1 - y) * torch.log(1 - y_pred)) / n
-    
-    bce_loss = losses.sum()
+    bce_loss = losses.mean()
     
     return bce_loss
 
@@ -259,8 +253,8 @@ def forward_pass(model: nn.Module, batch: dict, device="cpu"):
     
     tensor_premise, tensor_hypothesis = convert_to_tensors(batch["premise"]), convert_to_tensors(batch["hypothesis"])
     
-    tensor_premise.to(device)
-    tensor_hypothesis.to(device)
+    tensor_premise = tensor_premise.to(device)
+    tensor_hypothesis = tensor_hypothesis.to(device)
     model.to(device)
     
     return model(tensor_premise, tensor_hypothesis)
@@ -282,7 +276,6 @@ def f1_score(y: torch.Tensor, y_pred: torch.Tensor, threshold=0.5) -> torch.Tens
     if threshold:
         y_pred = torch.where(y_pred > 0.5, torch.tensor(1), torch.tensor(0))
     
-
     TP = 0
     FP = 0
     TN = 0
@@ -301,8 +294,6 @@ def f1_score(y: torch.Tensor, y_pred: torch.Tensor, threshold=0.5) -> torch.Tens
         elif not real_label and not predicted_label:
             TN += 1
     
-    print(TP, FP, TN, FN)
-    
     precision = TP / (TP + FP)
     recall = TP / (TP + FN)
     
@@ -311,45 +302,6 @@ def f1_score(y: torch.Tensor, y_pred: torch.Tensor, threshold=0.5) -> torch.Tens
     return torch.tensor(f1_score)
 
 ### 2.5 Train loop
-
-def process_batch(batch: dict) -> dict:
-        """
-        Processes a batch into tokenized form.
-
-        Parameters
-        ----------
-        batch: dict
-            A dictionary containing the "premise", "hypothesis", and "label" lists.
-
-        Returns
-        -------
-        labels: List[int]
-            A list of the true labels for each example.
-        
-        tokenized_premise: torch.Tensor
-            A tensor of the tokenized premise sentences.
-            
-        tokenized_hypothesis: torch.Tensor
-            A tensor of the tokenized hypothesis sentences.
-        """
-        
-        batch_tokens = {
-            "premise": tokenize(batch["premise"], max_length=64),
-            "hypothesis": tokenize(batch["hypothesis"], max_length=64),
-        }
-
-        word_counts = build_word_counts(
-            batch_tokens["premise"]
-            + batch_tokens["hypothesis"]
-        )
-        
-        index_map = build_index_map(word_counts, max_words=10000)
-
-        tokenized_premise = tokens_to_ix(batch_tokens["premise"], index_map)
-        tokenized_hypothesis = tokens_to_ix(batch_tokens["hypothesis"], index_map)
-        
-        return {"premise": tokenized_premise, "hypothesis": tokenized_hypothesis, "label": batch["label"]}
-    
 def eval_run(
     model: nn.Module, loader: Callable[[], Iterable[dict]], device: str = "cpu"
 ) -> torch.Tensor:
@@ -380,23 +332,22 @@ def train_loop(
     model.to(device)
     
     f1_scores = []
+    losses = []
     
     for _ in range(n_epochs): 
         
         model.train()
         
         for batch in train_loader():
-            print("batch is", batch)
             y_true = torch.tensor(batch["label"])
-            print("y_true is", y_true)
             predictions = forward_pass(model, batch)
-            print("predictions are", predictions)
-            backward_pass(optimizer, y_true, predictions)
+            loss = backward_pass(optimizer, y_true, predictions)
+            losses.append(loss.item())
         
         model.eval()
 
         valid_true, valid_predictions = eval_run(model, valid_loader)
-        score = 10
+        score = f1_score(valid_true, valid_predictions)
         f1_scores.append(score)
             
         print(f"F1 score: {score}")
@@ -559,19 +510,44 @@ if __name__ == "__main__":
     }
     
     # 1.1
-    train_loader = build_loader(train_indices, 128, True)
-    valid_loader = build_loader(valid_indices, 128, True)
+    train_loader1 = build_loader(train_indices, 128, True)
+    valid_loader1 = build_loader(valid_indices, 128, True)
     
     # 1.2
-    batch = next(train_loader())
+    #batch = next(train_loader())
     
     # 2.1
-    embedding = nn.Embedding(10000, 64)
-    model = PooledLogisticRegression(embedding)
-    optimizer = assign_optimizer(model, lr=0.001)
-    for x in train_loop(model, train_loader, valid_loader, optimizer, n_epochs=5, device=device):
-        continue
+    embedding1 = nn.Embedding(10000, 32, padding_idx=0)
+    model1 = PooledLogisticRegression(embedding1) 
+    optimizer1 = assign_optimizer(model1, lr=0.001)
+    f1_scores1 = train_loop(model1, train_loader1, valid_loader1, optimizer1, n_epochs=8, device=device)
     
+    train_loader2 = build_loader(train_indices, 128, True)
+    valid_loader2 = build_loader(valid_indices, 128, True)
+    
+    embedding2 = nn.Embedding(10000, 32, padding_idx=0)
+    model2 = ShallowNeuralNetwork(embedding2, hidden_size=64)
+    optimizer2 = assign_optimizer(model2, lr=0.0005)
+    f1_scores2 = train_loop(model2, train_loader2, valid_loader2, optimizer2, n_epochs=8, device=device)
+    
+    train_loader3 = build_loader(train_indices, 128, True)
+    valid_loader3 = build_loader(valid_indices, 128, True)
+    
+    embedding3 = nn.Embedding(10000, 32, padding_idx=0)
+    model3 = DeepNeuralNetwork(embedding3, hidden_size=64, num_layers=3)
+    optimizer3 = assign_optimizer(model3, lr=0.0005)
+    f1_scores3 = train_loop(model3, train_loader3, valid_loader3, optimizer3, n_epochs=8, device=device)
+    
+    plt.figure(figsize=(10,6))
+    plt.plot(f1_scores1, label='Pooled Logistic Regression F1 Score')
+    plt.plot(f1_scores2, label='Shallow Neural Network F1 Score')
+    plt.plot(f1_scores3, label='Deep Neural Network F1 Score')
+    plt.xlabel('Epoch')
+    plt.ylabel('F1 Score')
+    plt.title('F1 Score per Epoch for Different Models')
+    plt.legend()
+    plt.savefig("f1_scores.png")
+
     # 2.2
     optimizer = "your code here"
 
