@@ -276,7 +276,7 @@ def f1_score(y: torch.Tensor, y_pred: torch.Tensor, threshold=0.5) -> torch.Tens
         y_pred = torch.where(y_pred > 0.5, torch.tensor(1), torch.tensor(0))
     
     #To avoid division by zero
-    eps = 1e-8
+    eps = 1e-5
     
     TP = 0
     FP = 0
