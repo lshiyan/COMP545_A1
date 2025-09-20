@@ -338,6 +338,9 @@ def train_loop(
         model.train()
         
         for batch in train_loader():
+            print(batch)
+        
+        """
             y_true = torch.tensor(batch["label"])
             predictions = forward_pass(model, batch)
             loss = backward_pass(optimizer, y_true, predictions)
@@ -349,7 +352,7 @@ def train_loop(
         score = f1_score(valid_true, valid_predictions)
         f1_scores.append(score)
             
-        print(f"F1 score: {score}")
+        print(f"F1 score: {score}")"""
         
     return f1_scores
 
